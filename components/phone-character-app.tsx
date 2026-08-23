@@ -480,7 +480,8 @@ function CharListView({
       const [aId, bId] = [relation.fromCharacterId, relation.toCharacterId].sort();
       const key = `${aId}__${bId}`;
       const existing = pairs.get(key);
-      if (existing) {        if (!existing.labels.includes(relation.label)) existing.labels.push(relation.label);
+      if (existing) {       
+        if (!existing.labels.includes(relation.label)) existing.labels.push(relation.label);
       } else {
         pairs.set(key, { key, aId, bId, labels: [relation.label] });
       }
@@ -962,7 +963,8 @@ function CharListView({
       );
     } else if (item.type === 'blue-note') {
       baseClass = "char-sticky-note";
-      extraAttrs = { "data-color": "blue" };      content = (
+      extraAttrs = { "data-color": "blue" };      
+      content = (
         <>
           <div className="font-bold border-b border-[#999] pb-0.5 mb-1">ROUTING SLIP</div>
           <div><strong>TO:</strong> Agent {hash % 99}</div>
@@ -1444,7 +1446,8 @@ function CharListView({
                 transform: 'rotate(-1.5deg)'
               }}
             >
-              {/* tape decoration on top */}              <div className="absolute rounded-[1px]" style={{ top: -6, left: '50%', marginLeft: -18, width: 36, height: 12, background: 'rgba(255,255,255,0.55)', transform: 'rotate(1deg)' }} />
+              {/* tape decoration on top */}           
+              <div className="absolute rounded-[1px]" style={{ top: -6, left: '50%', marginLeft: -18, width: 36, height: 12, background: 'rgba(255,255,255,0.55)', transform: 'rotate(1deg)' }} />
               <div className="text-center ts-12 font-bold text-[#4a3f2f] mb-3 tracking-[1px] uppercase">Select Format</div>
               <div className="flex gap-1.5 justify-center">
                 {[
@@ -2408,7 +2411,8 @@ function CharArchiveView({
                           onClick={() => setDeleteVersionTarget(version)}
                         >
                           删除
-                        </button>                      </div>
+                        </button>               
+                      </div>
                     </div>
                   ))}
                 </div>
