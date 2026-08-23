@@ -330,8 +330,7 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                                             key={c.id}
                                             onClick={() => {
                                                 const sess = createOrGetSession(char.id);
-                                                onSelectSession(sess);
-                                            }}
+                                                onSelectSession(sess);                                            }}
                                             className="minimal-list-item"
                                         >
                                             <div className="minimal-avatar-wrapper">
@@ -603,4 +602,64 @@ export function ChatContactsList({ onCloseApp, onSelectSession, onSelectMascot, 
                                         <div className="ts-18 font-bold text-[var(--c-text-title)] mb-1">{addResult.name || "UNNAMED"}</div>
                                         <div className="menu-desc">微信号: {addResult.wechatID || "N/A"}</div>
                                         <div className="menu-desc">个性签名: {addResult.persona ? addResult.persona.slice(0, 30) + (addResult.persona.length > 30 ? "..." : "") : "暂无"}</div>
-         
+                                    </div>
+                                </div>
+                            </div>
+                            <button onClick={() => setIsSendingAdd(true)} className="ui-btn ui-btn-success w-full">添加到通讯录</button>
+                        </div>
+                    )}
+                    {isSendingAdd && addResult && (
+                        <div className="page-menu">
+                            <p className="menu-group-desc mx-0">发送添加朋友申请</p>
+                            <div className="menu-group">
+                                <div className="menu-item !items-start">
+                                    <textarea
+                                        autoFocus
+                                        value={greetingText}
+                                        onChange={e => setGreetingText(e.target.value)}
+                                        placeholder="输入打招呼信息..."
+                                        className="ui-textarea ui-input-inline min-h-[60px]"
+                                    />
+                                    <button onClick={() => setGreetingText("")} className="ui-bare-btn text-[var(--c-icon)]">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-3">
+                                <button
+                                    onClick={() => {
+                                        addChatContact(addResult.id);
+                                        clearRequestsForCharacter(addResult.id);
+                                        dispatchFriendRequestUpdated();
+                                        const newSession = createOrGetSession(addResult.id);
+                                        const isReAdd = loadChatMessages(newSession.id).length > 0;
+                                        const charIdentity = resolveUserIdentity(addResult.id, "chat");
+                                        const userName = charIdentity?.name || identity?.name || "你";
+                                        if (isReAdd) {
+                                            const charName = addResult.name || "用户";
+                                            pushChatMessage({ sessionId: newSession.id, role: "system", content: `${userName}向${charName}发起了好友申请\n${charName}通过了好友申请`, status: "sent" });
+                                            kvSet(PENDING_REPLY_PREFIX + newSession.id, "1");
+                                        } else {
+                                            pushChatMessage({ sessionId: newSession.id, role: "system", content: `${userName}已添加了${addResult.name || "用户"}，现在可以开始聊天了。`, status: "sent" });
+                                        }
+                                        if (greetingText.trim()) {
+                                            pushChatMessage({ sessionId: newSession.id, role: "user", content: greetingText.trim(), status: "sent" });
+                                        }
+                                        refresh();
+                                        onSelectSession(newSession);
+                                        addFromCardRef.current = false;
+                                        setIsAddFriendOpen(false);
+                                    }}
+                                    className="ui-btn ui-btn-success w-full"
+                                >发送</button>
+                                <button onClick={() => setIsSendingAdd(false)} className="ui-btn ui-btn-ghost w-full">取消</button>
+                            </div>
+                        </div>
+                    )}
+                </PageShell>
+                </div>
+                </div>
+            )}
+        </div>
+    );
+}
