@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } fr
 import { getAllPosts, deleteMomentPost, getUnreadMomentsNotifications, saveMomentsLastSeen, addMomentComment } from "@/lib/moments-storage";
 import { loadChatContacts } from "@/lib/chat-storage";
 import { resolveUserIdentity } from "@/lib/settings-storage";
+import { getActiveChatWorldId, setActiveChatWorldId } from "@/lib/character-world-storage";
 import { saveChatImageToIndexedDB, getChatImageFromIndexedDB } from "@/lib/chat-asset-storage";
 import type { MomentComment, MomentPost } from "@/lib/moments-types";
 import { MomentPostCard } from "./moment-post-card";
@@ -43,7 +44,7 @@ type MomentsFeedProps = {
 
 export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     const [posts, setPosts] = useState<MomentPost[]>([]);
-    const [activeWorldId, setActiveWorldId] = useState<string>("all");
+    const [activeWorldId, setActiveWorldId] = useState<string>(() => getActiveChatWorldId());
     const [showCompose, setShowCompose] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     // 后台生图失败：弹一次弹窗提示，关掉即消失（同时多条失败只提示第一条）
@@ -197,16 +198,19 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     }, []);
 
     const activeWorld = activeWorldId === "all" ? null : worldGroups.find((g: any) => g.id === activeWorldId);
-    const activeWorldMemberIds = activeWorld ? new Set(activeWorld.memberIds) : null;
+    const activeWorldMemberIds = useMemo(
+        () => (activeWorld ? new Set<string>(activeWorld.memberIds) : null),
+        [activeWorld]
+    );
 
     const filteredPosts = useMemo(() => {
         if (!activeWorldMemberIds) return posts;
         return posts.filter(post => {
-            if (post.authorType === 'character' && !activeWorldMemberIds.has(post.authorId)) {
-                return false;
+            if (post.authorType === 'character') {
+                return activeWorldMemberIds.has(post.authorId);
             }
-            // You might want to filter posts visible to characters too, but base level author filtering is enough for feed isolation
-            return true;
+            // 用户自己的动态：只有可见名单里至少有一个本世界角色时，才出现在该世界
+            return (post.visibility ?? []).some(id => activeWorldMemberIds.has(id));
         });
     }, [posts, activeWorldMemberIds]);
 
@@ -426,6 +430,7 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
                 <MomentsCompose
                     onClose={() => setShowCompose(false)}
                     onPublished={handlePublished}
+                    allowedCharacterIds={activeWorldMemberIds ? Array.from(activeWorldMemberIds) : undefined}
                 />
             ) : activeComposer ? (
                 <div className="feed-comment-modal-layer" data-ui="modal">
@@ -570,7 +575,7 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
                             className="bg-[var(--c-input)] text-[var(--c-text)] text-xs rounded-md px-2 py-1 outline-none appearance-none"
                             style={{ minWidth: "80px", textAlign: "center" }}
                             value={activeWorldId}
-                            onChange={(e) => setActiveWorldId(e.target.value)}
+                            onChange={(e) => { setActiveWorldId(e.target.value); setActiveChatWorldId(e.target.value); }}
                         >
                             <option value="all">所有世界</option>
                             {worldGroups.map((g: any) => (
