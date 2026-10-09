@@ -43,6 +43,7 @@ type MomentsFeedProps = {
 
 export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     const [posts, setPosts] = useState<MomentPost[]>([]);
+    const [activeWorldId, setActiveWorldId] = useState<string>("all");
     const [showCompose, setShowCompose] = useState(false);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     // 后台生图失败：弹一次弹窗提示，关掉即消失（同时多条失败只提示第一条）
@@ -100,7 +101,8 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
 
     const refreshPosts = useCallback(() => {
         const contactIds = new Set(loadChatContacts().map(c => c.characterId));
-        setPosts(getAllPosts().filter(p => p.authorType === "user" || contactIds.has(p.authorId)));
+        let allFiltered = getAllPosts().filter(p => p.authorType === "user" || contactIds.has(p.authorId));
+        setPosts(allFiltered);
         setUnreadNotifs(getUnreadMomentsNotifications());
     }, []);
 
@@ -187,8 +189,26 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
         }, 3000);
     }, [getScrollElement, restoreScrollAnchor, stopLoadMoreAnchorTracking]);
 
-    const visiblePosts = posts.slice(0, visiblePostCount);
-    const hasMorePosts = visiblePostCount < posts.length;
+    const worldGroups = React.useMemo(() => {
+        return (typeof window !== "undefined") ? require("@/lib/character-world-storage").loadCharacterWorldGroups() : [];
+    }, []);
+
+    const activeWorld = activeWorldId === "all" ? null : worldGroups.find((g: any) => g.id === activeWorldId);
+    const activeWorldMemberIds = activeWorld ? new Set(activeWorld.memberIds) : null;
+
+    const filteredPosts = React.useMemo(() => {
+        if (!activeWorldMemberIds) return posts;
+        return posts.filter(post => {
+            if (post.authorType === 'character' && !activeWorldMemberIds.has(post.authorId)) {
+                return false;
+            }
+            // You might want to filter posts visible to characters too, but base level author filtering is enough for feed isolation
+            return true;
+        });
+    }, [posts, activeWorldMemberIds]);
+
+    const visiblePosts = filteredPosts.slice(0, visiblePostCount);
+    const hasMorePosts = visiblePostCount < filteredPosts.length;
 
     const handleLoadMorePosts = useCallback(() => {
         if (!hasMorePosts) return;
@@ -540,8 +560,25 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
                     </button>
                 )}
 
+                {/* World Filter */}
+                {worldGroups.length > 1 && (
+                    <div className="px-5 mb-2 flex justify-end">
+                        <select
+                            className="bg-[var(--c-input)] text-[var(--c-text)] text-xs rounded-md px-2 py-1 outline-none appearance-none"
+                            style={{ minWidth: "80px", textAlign: "center" }}
+                            value={activeWorldId}
+                            onChange={(e) => setActiveWorldId(e.target.value)}
+                        >
+                            <option value="all">所有世界</option>
+                            {worldGroups.map((g: any) => (
+                                <option key={g.id} value={g.id}>{g.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                )}
+
                 {/* Posts list */}
-                {posts.length === 0 ? (
+                {filteredPosts.length === 0 ? (
                     <div className="feed-empty-state py-10 text-center text-[var(--c-icon)] ts-14">
                         还没有动态，发一条吧
                     </div>

@@ -23,9 +23,23 @@ export type CharacterWorldGroup = {
     description: string;
     memberIds: string[];
     relations: CharacterWorldRelation[];
+    userIdentityId?: string;
     createdAt: string;
     updatedAt: string;
 };
+
+export const ACTIVE_CHAT_WORLD_ID_KEY = "ai_phone_active_chat_world_id_v1";
+
+export function getActiveChatWorldId(): string {
+    if (typeof window === "undefined") return "all";
+    return kvGet(ACTIVE_CHAT_WORLD_ID_KEY) || "all";
+}
+
+export function setActiveChatWorldId(worldId: string): void {
+    if (typeof window === "undefined") return;
+    kvSet(ACTIVE_CHAT_WORLD_ID_KEY, worldId);
+    window.dispatchEvent(new CustomEvent("chat-world-changed", { detail: { worldId } }));
+}
 
 function isBrowser(): boolean {
     return typeof window !== "undefined";
@@ -108,6 +122,7 @@ function normalizeGroups(groups: CharacterWorldGroup[], characters: Character[])
                 description: typeof group.description === "string" ? group.description.trim() : "",
                 memberIds: members,
                 relations,
+                userIdentityId: typeof group.userIdentityId === "string" ? group.userIdentityId : undefined,
                 createdAt: group.createdAt || now,
                 updatedAt: group.updatedAt || now,
             };
@@ -182,6 +197,15 @@ export function updateCharacterWorldDescription(groupId: string, description: st
     saveCharacterWorldGroups(loadCharacterWorldGroups().map(group =>
         group.id === groupId
             ? { ...group, description, updatedAt: now }
+            : group
+    ));
+}
+
+export function updateCharacterWorldIdentity(groupId: string, userIdentityId?: string): void {
+    const now = new Date().toISOString();
+    saveCharacterWorldGroups(loadCharacterWorldGroups().map(group =>
+        group.id === groupId
+            ? { ...group, userIdentityId: userIdentityId || undefined, updatedAt: now }
             : group
     ));
 }
