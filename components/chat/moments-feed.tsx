@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useCallback, useLayoutEffect, useMemo, useRef } from "react";
 import { getAllPosts, deleteMomentPost, getUnreadMomentsNotifications, saveMomentsLastSeen, addMomentComment } from "@/lib/moments-storage";
 import { loadChatContacts } from "@/lib/chat-storage";
 import { resolveUserIdentity } from "@/lib/settings-storage";
@@ -192,14 +192,14 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
         }, 3000);
     }, [getScrollElement, restoreScrollAnchor, stopLoadMoreAnchorTracking]);
 
-    const worldGroups = React.useMemo(() => {
+    const worldGroups = useMemo(() => {
         return (typeof window !== "undefined") ? require("@/lib/character-world-storage").loadCharacterWorldGroups() : [];
     }, []);
 
     const activeWorld = activeWorldId === "all" ? null : worldGroups.find((g: any) => g.id === activeWorldId);
     const activeWorldMemberIds = activeWorld ? new Set(activeWorld.memberIds) : null;
 
-    const filteredPosts = React.useMemo(() => {
+    const filteredPosts = useMemo(() => {
         if (!activeWorldMemberIds) return posts;
         return posts.filter(post => {
             if (post.authorType === 'character' && !activeWorldMemberIds.has(post.authorId)) {
