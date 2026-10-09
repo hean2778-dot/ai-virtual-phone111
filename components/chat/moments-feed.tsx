@@ -51,7 +51,10 @@ export function MomentsFeed({ onCloseApp }: MomentsFeedProps) {
     const [coverUrl, setCoverUrl] = useState<string | null>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
-    const userIdentity = resolveUserIdentity(undefined, "chat");
+    const [userIdentity, setUserIdentity] = useState<any>(() => resolveUserIdentity(undefined, "chat"));
+    useEffect(() => {
+        setUserIdentity(resolveUserIdentity(undefined, "chat"));
+    }, [activeWorldId]);
     const [signature, setSignature] = useState(() => {
         if (typeof window !== "undefined") {
             return kvGet("moments_signature") || "make every day count (●ˇ∀ˇ●)";

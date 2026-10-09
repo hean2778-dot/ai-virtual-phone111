@@ -1,5 +1,5 @@
 import { loadCharacters } from "./character-storage";
-import { loadChatContacts } from "./chat-storage";
+// Removed circular loadChatContacts import
 import { kvGet, kvSet, registerKvMigration } from "./kv-db";
 import type { Character } from "./character-types";
 import type { MomentComment, MomentLike, MomentPost } from "./moments-types";
@@ -356,7 +356,11 @@ export function formatCharacterRelationsForPrompt(characterId: string): string {
     const characters = loadCharacters();
     const nameById = new Map(characters.map(character => [character.id, character.name]));
     // 标注哪些同世界角色已是用户好友——供「推荐联系人」判断是否还需要发名片
-    const contactIds = new Set(loadChatContacts().map(contact => contact.characterId));
+    let contactIds = new Set<string>();
+    try {
+        const { loadChatContacts } = require("./chat-storage");
+        contactIds = new Set(loadChatContacts().map((contact: any) => contact.characterId));
+    } catch { /* ignore */ }
     const memberNames = group.memberIds
         .map(memberId => {
             const name = nameById.get(memberId);
