@@ -38,7 +38,31 @@ export function getActiveChatWorldId(): string {
 export function setActiveChatWorldId(worldId: string): void {
     if (typeof window === "undefined") return;
     kvSet(ACTIVE_CHAT_WORLD_ID_KEY, worldId);
+    syncGlobalUserIdentityToWorld(worldId);
     window.dispatchEvent(new CustomEvent("chat-world-changed", { detail: { worldId } }));
+}
+
+/**
+ * 切换世界时，把「全局默认用户人设」同步成该世界绑定的人设。
+ * 全局默认总有值，会盖过世界绑定，所以必须直接改全局设定才会生效。
+ * "all" 或该世界没绑人设时不改动。
+ */
+function syncGlobalUserIdentityToWorld(worldId: string): void {
+    if (!worldId || worldId === "all") return;
+    try {
+        const group = loadCharacterWorldGroups().find(g => g.id === worldId);
+        const identityId = group?.userIdentityId;
+        if (!identityId) return;
+        // 懒加载，避免与 settings-storage 形成循环依赖
+        const { loadUserIdentities, loadBindingConfig, saveBindingConfig } = require("./settings-storage");
+        if (!loadUserIdentities().some((i: { id: string }) => i.id === identityId)) return;
+        const config = loadBindingConfig();
+        if (config.globalDefaults?.userIdentityId === identityId) return;
+        saveBindingConfig({
+            ...config,
+            globalDefaults: { ...config.globalDefaults, userIdentityId: identityId },
+        });
+    } catch { /* ignore */ }
 }
 
 function isBrowser(): boolean {
