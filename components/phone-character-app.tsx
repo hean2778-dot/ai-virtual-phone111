@@ -1443,6 +1443,11 @@ function CharListView({
               require("@/lib/character-world-storage").updateCharacterWorldIdentity(currentGroup.id, identityId);
             } catch { }
           }}
+          onUpdateWorldBooks={bookIds => {
+            try {
+              require("@/lib/character-world-storage").updateCharacterWorldBooks(currentGroup.id, bookIds);
+            } catch { }
+          }}
           onDelete={() => {
             deleteCharacterWorldGroup(currentGroup.id);
             setShowWorldEditor(false);
