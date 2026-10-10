@@ -24,6 +24,8 @@ export type CharacterWorldGroup = {
     memberIds: string[];
     relations: CharacterWorldRelation[];
     userIdentityId?: string;
+    /** 该世界配套的世界书；进入世界时同步为全局默认世界书 */
+    worldBookIds?: string[];
     createdAt: string;
     updatedAt: string;
 };
@@ -38,30 +40,44 @@ export function getActiveChatWorldId(): string {
 export function setActiveChatWorldId(worldId: string): void {
     if (typeof window === "undefined") return;
     kvSet(ACTIVE_CHAT_WORLD_ID_KEY, worldId);
-    syncGlobalUserIdentityToWorld(worldId);
+    syncGlobalBindingsToWorld(worldId);
     window.dispatchEvent(new CustomEvent("chat-world-changed", { detail: { worldId } }));
 }
 
 /**
- * 切换世界时，把「全局默认用户人设」同步成该世界绑定的人设。
+ * 切换世界时，把「全局默认」里的用户人设、世界书同步成该世界卷宗绑定的内容。
  * 全局默认总有值，会盖过世界绑定，所以必须直接改全局设定才会生效。
- * "all" 或该世界没绑人设时不改动。
+ * "all" 或该世界没绑对应项时，该项不改动。
  */
-function syncGlobalUserIdentityToWorld(worldId: string): void {
+function syncGlobalBindingsToWorld(worldId: string): void {
     if (!worldId || worldId === "all") return;
     try {
         const group = loadCharacterWorldGroups().find(g => g.id === worldId);
-        const identityId = group?.userIdentityId;
-        if (!identityId) return;
+        if (!group) return;
         // 懒加载，避免与 settings-storage 形成循环依赖
-        const { loadUserIdentities, loadBindingConfig, saveBindingConfig } = require("./settings-storage");
-        if (!loadUserIdentities().some((i: { id: string }) => i.id === identityId)) return;
+        const { loadUserIdentities, loadWorldBooks, loadBindingConfig, saveBindingConfig } = require("./settings-storage");
         const config = loadBindingConfig();
-        if (config.globalDefaults?.userIdentityId === identityId) return;
-        saveBindingConfig({
-            ...config,
-            globalDefaults: { ...config.globalDefaults, userIdentityId: identityId },
-        });
+        const nextDefaults = { ...config.globalDefaults };
+        let changed = false;
+
+        const identityId = group.userIdentityId;
+        if (identityId
+            && loadUserIdentities().some((i: { id: string }) => i.id === identityId)
+            && nextDefaults.userIdentityId !== identityId) {
+            nextDefaults.userIdentityId = identityId;
+            changed = true;
+        }
+
+        const existingBookIds = new Set<string>(loadWorldBooks().map((b: { id: string }) => b.id));
+        const bookIds = (group.worldBookIds ?? []).filter(id => existingBookIds.has(id));
+        const currentBookIds: string[] = nextDefaults.worldBookIds ?? [];
+        if (bookIds.length > 0
+            && (bookIds.length !== currentBookIds.length || bookIds.some((id, i) => id !== currentBookIds[i]))) {
+            nextDefaults.worldBookIds = bookIds;
+            changed = true;
+        }
+
+        if (changed) saveBindingConfig({ ...config, globalDefaults: nextDefaults });
     } catch { /* ignore */ }
 }
 
@@ -147,6 +163,9 @@ function normalizeGroups(groups: CharacterWorldGroup[], characters: Character[])
                 memberIds: members,
                 relations,
                 userIdentityId: typeof group.userIdentityId === "string" ? group.userIdentityId : undefined,
+                worldBookIds: Array.isArray(group.worldBookIds)
+                    ? group.worldBookIds.filter((id): id is string => typeof id === "string")
+                    : undefined,
                 createdAt: group.createdAt || now,
                 updatedAt: group.updatedAt || now,
             };
@@ -230,6 +249,15 @@ export function updateCharacterWorldIdentity(groupId: string, userIdentityId?: s
     saveCharacterWorldGroups(loadCharacterWorldGroups().map(group =>
         group.id === groupId
             ? { ...group, userIdentityId: userIdentityId || undefined, updatedAt: now }
+            : group
+    ));
+}
+
+export function updateCharacterWorldBooks(groupId: string, worldBookIds: string[]): void {
+    const now = new Date().toISOString();
+    saveCharacterWorldGroups(loadCharacterWorldGroups().map(group =>
+        group.id === groupId
+            ? { ...group, worldBookIds: worldBookIds.length > 0 ? [...worldBookIds] : undefined, updatedAt: now }
             : group
     ));
 }

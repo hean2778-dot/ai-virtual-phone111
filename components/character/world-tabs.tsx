@@ -62,6 +62,7 @@ export function WorldCaseSheet({
   onRename,
   onUpdateDescription,
   onUpdateIdentity,
+  onUpdateWorldBooks,
   onDelete,
   onClose,
 }: {
@@ -69,12 +70,14 @@ export function WorldCaseSheet({
   onRename: (name: string) => void;
   onUpdateDescription: (description: string) => void;
   onUpdateIdentity?: (identityId?: string) => void;
+  onUpdateWorldBooks?: (worldBookIds: string[]) => void;
   onDelete: () => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState(group.name);
   const [description, setDescription] = useState(group.description);
   const [identityId, setIdentityId] = useState(group.userIdentityId || "");
+  const [worldBookIds, setWorldBookIds] = useState<string[]>(group.worldBookIds ?? []);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const isDefault = group.id === DEFAULT_CHARACTER_WORLD_ID;
 
@@ -82,10 +85,20 @@ export function WorldCaseSheet({
     ? require("@/lib/settings-storage").loadUserIdentities()
     : [];
 
+  const worldBooks: any[] = (typeof window !== "undefined")
+    ? require("@/lib/settings-storage").loadWorldBooks()
+    : [];
+  const toggleWorldBook = (id: string) =>
+    setWorldBookIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]));
+
   const save = () => {
     if (name.trim() && name.trim() !== group.name) onRename(name.trim());
     if (description.trim() !== group.description) onUpdateDescription(description.trim());
     if (identityId !== (group.userIdentityId || "")) onUpdateIdentity?.(identityId || undefined);
+    const prevBooks = group.worldBookIds ?? [];
+    if (worldBookIds.length !== prevBooks.length || worldBookIds.some((id, i) => id !== prevBooks[i])) {
+      onUpdateWorldBooks?.(worldBookIds);
+    }
     onClose();
   };
 
@@ -117,6 +130,20 @@ export function WorldCaseSheet({
             </option>
           ))}
         </select>
+        <label className="wt-paper-label">配套世界书（进入该世界时自动切换为勾选的世界书；不勾则不改动）</label>
+        <div className="wt-paper-input" style={{ marginBottom: 12, maxHeight: 120, overflowY: "auto" }}>
+          {worldBooks.length === 0 && <span style={{ opacity: 0.6 }}>还没有世界书</span>}
+          {worldBooks.map((book: any) => (
+            <label key={book.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 0" }}>
+              <input
+                type="checkbox"
+                checked={worldBookIds.includes(book.id)}
+                onChange={() => toggleWorldBook(book.id)}
+              />
+              <span>{book.name}</span>
+            </label>
+          ))}
+        </div>
         <label className="wt-paper-label">世界观描述（会注入该世界所有角色的上下文）</label>
         <textarea
           className="wt-paper-textarea"
