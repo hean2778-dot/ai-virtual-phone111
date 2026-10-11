@@ -9,6 +9,7 @@ import { resolveUserIdentity } from "@/lib/settings-storage";
 import type { UserIdentity } from "@/components/settings/user-identity";
 import { PENDING_REPLY_PREFIX } from "@/lib/friend-request-engine";
 import { clearRequestsForCharacter, dispatchFriendRequestUpdated } from "@/lib/friend-request-storage";
+import { loadCharacterWorldGroups } from "@/lib/character-world-storage";
 import { UserProfilePanel } from "./user-profile-panel";
 import { PageShell } from "@/components/ui/page-shell";
 import { GroupCreateModal } from "./group-create-modal";
@@ -129,6 +130,37 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
 
     const [isSendingRequest, setIsSendingRequest] = useState(false);
     const [greetingText, setGreetingText] = useState("");
+    // 一键添加：二次确认用，值为 "all" 或世界 id
+    const [bulkConfirmKey, setBulkConfirmKey] = useState<string | null>(null);
+
+    /** 一键把一批角色加为好友：不打开聊天、不触发角色打招呼 */
+    const bulkAddFriends = (characterIds: string[]) => {
+        const chars = loadCharacters();
+        for (const id of characterIds) {
+            const char = chars.find(c => c.id === id);
+            if (!char) continue;
+            addChatContact(id);
+            clearRequestsForCharacter(id);
+            const session = createOrGetSession(id);
+            const isReAdd = loadChatMessages(session.id).length > 0;
+            const userName = resolveUserIdentity(id, "chat")?.name || "你";
+            const charName = char.name || "用户";
+            pushChatMessage({
+                sessionId: session.id,
+                role: "system",
+                content: isReAdd
+                    ? `${userName}向${charName}发起了好友申请\n${charName}通过了好友申请`
+                    : `${userName}已添加了${charName}，现在可以开始聊天了。`,
+                status: "sent",
+            });
+        }
+        dispatchFriendRequestUpdated();
+        setSessions(loadChatSessions());
+        setBulkConfirmKey(null);
+        setIsSearchModalOpen(false);
+        setSearchQuery("");
+        setSearchResult(undefined);
+    };
 
     const [showUserProfile, setShowUserProfile] = useState(false);
     const [showContactPicker, setShowContactPicker] = useState(false);
@@ -263,6 +295,7 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                     onClick={() => {
                                         setShowPlusMenu(false);
                                         setIsSearchModalOpen(true);
+                                        setBulkConfirmKey(null);
                                         setSearchQuery("");
                                         setSearchResult(undefined);
 
@@ -452,6 +485,47 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                         <div className="menu-item" style={{ pointerEvents: "none" }}>
                                             <span className="menu-desc">还不是好友的角色（点击填入号码）</span>
                                         </div>
+                                        {candidates.length > 1 && (
+                                            <button
+                                                className="menu-item"
+                                                onClick={() => {
+                                                    if (bulkConfirmKey !== "all") { setBulkConfirmKey("all"); return; }
+                                                    bulkAddFriends(candidates.map(c => c.id));
+                                                }}
+                                            >
+                                                <div className="menu-label-group">
+                                                    <span className="menu-label text-[var(--c-success)]">
+                                                        {bulkConfirmKey === "all" ? `再点一次，确认添加全部 ${candidates.length} 人` : `一键添加全部（${candidates.length}人）`}
+                                                    </span>
+                                                    <span className="menu-desc">直接加为好友，不会触发角色打招呼</span>
+                                                </div>
+                                            </button>
+                                        )}
+                                        {(() => {
+                                            const worldGroups = loadCharacterWorldGroups();
+                                            if (worldGroups.length < 2) return null;
+                                            const candidateIds = new Set(candidates.map(c => c.id));
+                                            return worldGroups.map(g => {
+                                                const ids = g.memberIds.filter(id => candidateIds.has(id));
+                                                if (ids.length === 0 || ids.length === candidates.length) return null;
+                                                return (
+                                                    <button
+                                                        key={g.id}
+                                                        className="menu-item"
+                                                        onClick={() => {
+                                                            if (bulkConfirmKey !== g.id) { setBulkConfirmKey(g.id); return; }
+                                                            bulkAddFriends(ids);
+                                                        }}
+                                                    >
+                                                        <div className="menu-label-group">
+                                                            <span className="menu-label text-[var(--c-success)]">
+                                                                {bulkConfirmKey === g.id ? `再点一次，确认添加「${g.name}」${ids.length} 人` : `一键添加「${g.name}」（${ids.length}人）`}
+                                                            </span>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            });
+                                        })()}
                                         {!mascotSettings.chatEnabled && (
                                             <button
                                                 className="menu-item"
@@ -548,7 +622,7 @@ export function ChatMessageList({ onCloseApp, activeSession, onSelectSession, on
                                         className="ui-textarea ui-input-inline min-h-[60px]"
                                     />
                                     <button onClick={() => setGreetingText("")} className="ui-bare-btn text-[var(--c-icon)]">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" /></svg>
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z" /></svg>
                                     </button>
                                 </div>
                             </div>
